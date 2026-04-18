@@ -1,0 +1,81 @@
+name: orb_assistant
+description: ORB - On-screen Reasoning Brain. A floating AI assistant that lives on your Android screen.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Overlay / Bubble
+  flutter_overlay_window: ^0.4.2
+
+  # HTTP / API calls
+  dio: ^5.4.0
+  http: ^1.2.0
+
+  # Local database
+  sqflite: ^2.3.2
+  path: ^1.9.0
+
+  # Secure storage for API keys
+  flutter_secure_storage: ^9.0.0
+
+  # Speech to text
+  speech_to_text: ^7.0.0
+
+  # Text to speech
+  flutter_tts: ^3.8.5
+
+  # PDF reading
+  syncfusion_flutter_pdf: ^24.1.41
+
+  # File picker
+  file_picker: ^8.0.0
+
+  # Alarm / phone actions
+  android_alarm_manager_plus: ^4.0.3
+
+  # Permissions
+  permission_handler: ^11.3.0
+
+  # Markdown rendering
+  flutter_markdown: ^0.6.22
+
+  # Shared preferences (for non-sensitive settings)
+  shared_preferences: ^2.2.2
+
+  # Icons
+  cupertino_icons: ^1.0.6
+  font_awesome_flutter: ^10.7.0
+
+  # Animations
+  lottie: ^3.1.0
+  animated_text_kit: ^4.2.2
+
+  # URL launcher
+  url_launcher: ^6.2.5
+
+  # Intl for date formatting
+  intl: ^0.19.0
+
+  # UUID for unique IDs
+  uuid: ^4.3.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/character/
+  fonts:
+    - family: SpaceMono
+      fonts:
+        - asset: assets/fonts/SpaceMono-Regular.ttf
+        - asset: assets/fonts/SpaceMono-Bold.ttf

@@ -1,0 +1,17 @@
+# Flutter
+.dart_tool/
+build/
+.packages
+
+# Android
+android/.gradle/
+android/app/build/
+
+# iOS
+ios/Pods/
+ios/.symlinks/
+
+# Misc
+*.log
+*.lock
+
