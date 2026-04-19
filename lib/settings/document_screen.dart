@@ -6,7 +6,6 @@ import '../utils/app_theme.dart';
 
 class DocumentScreen extends StatefulWidget {
   const DocumentScreen({super.key});
-
   @override
   State<DocumentScreen> createState() => _DocumentScreenState();
 }
@@ -24,10 +23,7 @@ class _DocumentScreenState extends State<DocumentScreen> {
 
   Future<void> _load() async {
     final docs = await PdfReader.instance.getSavedDocuments();
-    setState(() {
-      _documents = docs;
-      _loading = false;
-    });
+    setState(() { _documents = docs; _loading = false; });
   }
 
   Future<void> _addDocument() async {
@@ -38,39 +34,42 @@ class _DocumentScreenState extends State<DocumentScreen> {
     if (result == null) return;
 
     if (!result.success) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result.error ?? 'Failed to load document'),
-            backgroundColor: AppTheme.errorColor,
-          ),
-        );
-      }
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(result.error ?? 'Failed to load'), backgroundColor: AppTheme.errorColor),
+      );
       return;
     }
 
     await _load();
 
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Loaded: ${result.name}'),
-          backgroundColor: AppTheme.successColor,
-        ),
-      );
+    // Automatically open chat with this document
+    if (mounted && result.content != null) {
+      _openChat(result.name ?? 'Document', result.content!);
     }
   }
 
-  Future<void> _openWithOrb(SavedDocument doc) async {
+  void _openChat(String name, String content) {
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => Scaffold(
           backgroundColor: AppTheme.bgColor,
-          appBar: AppBar(title: Text(doc.name)),
+          appBar: AppBar(
+            title: Text(name, overflow: TextOverflow.ellipsis),
+            actions: [
+              Padding(
+                padding: const EdgeInsets.only(right: 12),
+                child: Chip(
+                  label: const Text('Document loaded', style: TextStyle(fontSize: 11, color: Colors.white)),
+                  backgroundColor: AppTheme.accentSecondary,
+                  padding: EdgeInsets.zero,
+                ),
+              ),
+            ],
+          ),
           body: ChatOverlay(
             onClose: () => Navigator.pop(context),
-            initialDocumentContext: doc.content,
+            initialDocumentContext: content,
           ),
         ),
       ),
@@ -85,19 +84,9 @@ class _DocumentScreenState extends State<DocumentScreen> {
         title: const Text('Documents'),
         actions: [
           if (_extracting)
-            const Padding(
-              padding: EdgeInsets.all(16),
-              child: SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-            )
+            const Padding(padding: EdgeInsets.all(16), child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)))
           else
-            IconButton(
-              icon: const Icon(Icons.add),
-              onPressed: _addDocument,
-            ),
+            IconButton(icon: const Icon(Icons.add), onPressed: _addDocument),
         ],
       ),
       body: _loading
@@ -107,24 +96,21 @@ class _DocumentScreenState extends State<DocumentScreen> {
               : ListView.builder(
                   padding: const EdgeInsets.all(16),
                   itemCount: _documents.length,
-                  itemBuilder: (context, index) {
-                    final doc = _documents[index];
-                    return _DocumentTile(
-                      document: doc,
-                      onAsk: () => _openWithOrb(doc),
-                      onDelete: () async {
-                        await PdfReader.instance.deleteDocument(doc.id);
-                        _load();
-                      },
-                    );
-                  },
+                  itemBuilder: (context, i) => _DocTile(
+                    doc: _documents[i],
+                    onAsk: () => _openChat(_documents[i].name, _documents[i].content),
+                    onDelete: () async {
+                      await PdfReader.instance.deleteDocument(_documents[i].id);
+                      _load();
+                    },
+                  ),
                 ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _addDocument,
         backgroundColor: AppTheme.accentColor,
         foregroundColor: Colors.black,
         icon: const Icon(Icons.upload_file),
-        label: const Text('Load Document'),
+        label: const Text('Load PDF / TXT'),
       ),
     );
   }
@@ -134,14 +120,12 @@ class _DocumentScreenState extends State<DocumentScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.picture_as_pdf_outlined,
-              color: AppTheme.subtitleColor, size: 48),
+          const Icon(Icons.picture_as_pdf_outlined, color: AppTheme.subtitleColor, size: 56),
           const SizedBox(height: 16),
-          const Text('No documents loaded', style: AppTheme.captionStyle),
+          const Text('No documents loaded', style: AppTheme.titleStyle),
           const SizedBox(height: 8),
-          const Text('Load a PDF or TXT file to ask ORB about it',
-              style: AppTheme.captionStyle),
-          const SizedBox(height: 24),
+          const Text('Load a PDF or TXT file\nthen ask ORB anything about it', style: AppTheme.captionStyle, textAlign: TextAlign.center),
+          const SizedBox(height: 28),
           ElevatedButton.icon(
             onPressed: _addDocument,
             icon: const Icon(Icons.upload_file),
@@ -153,23 +137,15 @@ class _DocumentScreenState extends State<DocumentScreen> {
   }
 }
 
-class _DocumentTile extends StatelessWidget {
-  final SavedDocument document;
-  final VoidCallback onAsk;
-  final VoidCallback onDelete;
-
-  const _DocumentTile({
-    required this.document,
-    required this.onAsk,
-    required this.onDelete,
-  });
+class _DocTile extends StatelessWidget {
+  final SavedDocument doc;
+  final VoidCallback onAsk, onDelete;
+  const _DocTile({required this.doc, required this.onAsk, required this.onDelete});
 
   @override
   Widget build(BuildContext context) {
-    final formatter = DateFormat('MMM d, yyyy');
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppTheme.surfaceColor,
         borderRadius: BorderRadius.circular(14),
@@ -178,63 +154,41 @@ class _DocumentTile extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              const Icon(Icons.description_outlined,
-                  color: AppTheme.accentColor, size: 20),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 8, 0),
+            child: Row(children: [
+              const Icon(Icons.description_outlined, color: AppTheme.accentColor, size: 20),
               const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  document.name,
-                  style: AppTheme.titleStyle,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.delete_outline,
-                    color: AppTheme.errorColor, size: 18),
-                onPressed: onDelete,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-              ),
-            ],
+              Expanded(child: Text(doc.name, style: AppTheme.titleStyle, overflow: TextOverflow.ellipsis)),
+              IconButton(icon: const Icon(Icons.delete_outline, color: AppTheme.errorColor, size: 18), onPressed: onDelete, padding: EdgeInsets.zero, constraints: const BoxConstraints()),
+            ]),
           ),
-          const SizedBox(height: 8),
-          Text(
-            document.content.substring(
-                0, document.content.length > 100 ? 100 : document.content.length),
-            style: AppTheme.captionStyle,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            child: Text(
+              doc.content.length > 120 ? '${doc.content.substring(0, 120)}...' : doc.content,
+              style: AppTheme.captionStyle,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Text(
-                'Added ${formatter.format(document.addedAt)}',
-                style: AppTheme.captionStyle.copyWith(fontSize: 11),
-              ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+            child: Row(children: [
+              Text('Added ${DateFormat('MMM d, yyyy').format(doc.addedAt)}', style: AppTheme.captionStyle.copyWith(fontSize: 11)),
               const Spacer(),
-              GestureDetector(
-                onTap: onAsk,
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: AppTheme.accentColor,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Text(
-                    'Ask ORB',
-                    style: TextStyle(
-                      color: Colors.black,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+              ElevatedButton.icon(
+                onPressed: onAsk,
+                icon: const Icon(Icons.chat_bubble_outline, size: 14),
+                label: const Text('Ask ORB'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.accentColor,
+                  foregroundColor: Colors.black,
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                 ),
               ),
-            ],
+            ]),
           ),
         ],
       ),

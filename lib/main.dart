@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_overlay_window/flutter_overlay_window.dart';
-import 'package:permission_handler/permission_handler.dart';
 
 import 'memory/database.dart';
 import 'settings/settings_screen.dart';
+import 'settings/document_screen.dart';
+import 'settings/telegram_screen.dart';
+import 'overlay/chat_overlay.dart';
 import 'overlay/bubble_entry.dart';
 import 'utils/app_theme.dart';
 import 'utils/constants.dart';
@@ -255,7 +257,12 @@ class _OrbHomeScreenState extends State<OrbHomeScreen>
                     onTap: () => Navigator.push(
                       context,
                       MaterialPageRoute(
-                          builder: (_) => const SettingsScreen()),
+                        builder: (_) => Scaffold(
+                          backgroundColor: AppTheme.bgColor,
+                          appBar: AppBar(title: const Text('Chat with ORB')),
+                          body: ChatOverlay(onClose: () => Navigator.pop(context)),
+                        ),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -264,8 +271,7 @@ class _OrbHomeScreenState extends State<OrbHomeScreen>
                     label: 'Documents',
                     onTap: () => Navigator.push(
                       context,
-                      MaterialPageRoute(
-                          builder: (_) => const SettingsScreen()),
+                      MaterialPageRoute(builder: (_) => const DocumentScreen()),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -274,8 +280,7 @@ class _OrbHomeScreenState extends State<OrbHomeScreen>
                     label: 'Telegram',
                     onTap: () => Navigator.push(
                       context,
-                      MaterialPageRoute(
-                          builder: (_) => const SettingsScreen()),
+                      MaterialPageRoute(builder: (_) => const TelegramScreen()),
                     ),
                   ),
                 ],
