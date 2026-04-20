@@ -61,7 +61,7 @@ class Constants {
   };
 
   static const int maxContextMessages = 10;
-  static const int maxTokens = 2048;
+  static const int maxTokens = 1024;
 
   static const String claudeEndpoint = 'https://api.anthropic.com/v1/messages';
   static const String openaiEndpoint = 'https://api.openai.com/v1/chat/completions';

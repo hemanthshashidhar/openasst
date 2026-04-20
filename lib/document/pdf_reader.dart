@@ -10,109 +10,138 @@ class PdfReader {
 
   final _uuid = const Uuid();
 
-  /// Pick a PDF file and extract its text
   Future<DocumentResult?> pickAndExtract() async {
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['pdf', 'txt'],
         allowMultiple: false,
+        withData: true, // ensure bytes are loaded on all platforms
       );
 
       if (result == null || result.files.isEmpty) return null;
 
       final file = result.files.first;
-      if (file.path == null) return null;
-
-      final extension = file.extension?.toLowerCase();
+      final extension = file.extension?.toLowerCase() ?? '';
 
       if (extension == 'txt') {
-        return await _extractFromTxt(file.path!, file.name);
+        return await _extractTxt(file);
       } else {
-        return await _extractFromPdf(file.path!, file.name);
+        return await _extractPdf(file);
       }
     } catch (e) {
-      return DocumentResult.error('Failed to open file: ${e.toString()}');
+      return DocumentResult.error('Failed to open file: $e');
     }
   }
 
-  Future<DocumentResult> _extractFromPdf(
-      String filePath, String fileName) async {
+  Future<DocumentResult> _extractPdf(PlatformFile file) async {
     try {
-      final bytes = await File(filePath).readAsBytes();
-      final document = PdfDocument(inputBytes: bytes);
+      // Try bytes first (more reliable), fall back to path
+      List<int>? bytes;
+      if (file.bytes != null) {
+        bytes = file.bytes!;
+      } else if (file.path != null) {
+        bytes = await File(file.path!).readAsBytes();
+      } else {
+        return DocumentResult.error('Cannot read file — no path or bytes available.');
+      }
+
+      PdfDocument? document;
+      try {
+        document = PdfDocument(inputBytes: bytes);
+      } catch (e) {
+        return DocumentResult.error('Could not parse PDF: $e');
+      }
+
+      final pageCount = document.pages.count;
+      if (pageCount == 0) {
+        document.dispose();
+        return DocumentResult.error('PDF has no pages.');
+      }
 
       final extractor = PdfTextExtractor(document);
-      final StringBuffer buffer = StringBuffer();
+      final buffer = StringBuffer();
 
-      for (int i = 0; i < document.pages.count; i++) {
-        final pageText = extractor.extractText(startPageIndex: i, endPageIndex: i);
-        if (pageText.trim().isNotEmpty) {
-          buffer.writeln('--- Page ${i + 1} ---');
-          buffer.writeln(pageText.trim());
-          buffer.writeln();
+      for (int i = 0; i < pageCount; i++) {
+        try {
+          final text = extractor.extractText(startPageIndex: i, endPageIndex: i);
+          if (text.trim().isNotEmpty) {
+            buffer.writeln('--- Page ${i + 1} ---');
+            buffer.writeln(text.trim());
+            buffer.writeln();
+          }
+        } catch (_) {
+          // Skip pages that fail extraction
         }
       }
 
       document.dispose();
 
-      final content = buffer.toString();
-      if (content.trim().isEmpty) {
+      var content = buffer.toString().trim();
+
+      if (content.isEmpty) {
         return DocumentResult.error(
-            'No text found in PDF. It may be a scanned image-only PDF.');
+          'No text found in this PDF.\n\nThis is likely a scanned/image-based PDF. ORB can only read text-based PDFs right now.',
+        );
       }
 
-      // Truncate if too large (keep first 15k chars for context)
-      final truncated = content.length > 15000
-          ? '${content.substring(0, 15000)}\n\n[... document truncated for context ...]'
-          : content;
+      // Trim to 15k chars to keep AI context manageable
+      if (content.length > 15000) {
+        content = '${content.substring(0, 15000)}\n\n[... document truncated for AI context ...]';
+      }
 
-      // Save to DB
       final id = _uuid.v4();
       await OrbDatabase.instance.insertDocument({
         'id': id,
-        'name': fileName,
-        'path': filePath,
-        'content': truncated,
+        'name': file.name,
+        'path': file.path ?? '',
+        'content': content,
         'added_at': DateTime.now().millisecondsSinceEpoch,
       });
 
       return DocumentResult.success(
         id: id,
-        name: fileName,
-        content: truncated,
-        pageCount: document.pages.count,
+        name: file.name,
+        content: content,
+        pageCount: pageCount,
       );
     } catch (e) {
-      return DocumentResult.error('PDF extraction failed: ${e.toString()}');
+      return DocumentResult.error('PDF extraction failed: $e');
     }
   }
 
-  Future<DocumentResult> _extractFromTxt(
-      String filePath, String fileName) async {
+  Future<DocumentResult> _extractTxt(PlatformFile file) async {
     try {
-      final content = await File(filePath).readAsString();
-      final truncated = content.length > 15000
-          ? '${content.substring(0, 15000)}\n\n[... document truncated ...]'
-          : content;
+      String content;
+      if (file.bytes != null) {
+        content = String.fromCharCodes(file.bytes!);
+      } else if (file.path != null) {
+        content = await File(file.path!).readAsString();
+      } else {
+        return DocumentResult.error('Cannot read text file.');
+      }
+
+      if (content.length > 15000) {
+        content = '${content.substring(0, 15000)}\n\n[... truncated ...]';
+      }
 
       final id = _uuid.v4();
       await OrbDatabase.instance.insertDocument({
         'id': id,
-        'name': fileName,
-        'path': filePath,
-        'content': truncated,
+        'name': file.name,
+        'path': file.path ?? '',
+        'content': content,
         'added_at': DateTime.now().millisecondsSinceEpoch,
       });
 
       return DocumentResult.success(
         id: id,
-        name: fileName,
-        content: truncated,
+        name: file.name,
+        content: content,
         pageCount: 1,
       );
     } catch (e) {
-      return DocumentResult.error('Text file extraction failed: ${e.toString()}');
+      return DocumentResult.error('Text file read failed: $e');
     }
   }
 
@@ -128,61 +157,29 @@ class PdfReader {
 
 class DocumentResult {
   final bool success;
-  final String? id;
-  final String? name;
-  final String? content;
+  final String? id, name, content, error;
   final int? pageCount;
-  final String? error;
 
-  DocumentResult._({
-    required this.success,
-    this.id,
-    this.name,
-    this.content,
-    this.pageCount,
-    this.error,
-  });
+  DocumentResult._({required this.success, this.id, this.name, this.content, this.pageCount, this.error});
 
-  factory DocumentResult.success({
-    required String id,
-    required String name,
-    required String content,
-    required int pageCount,
-  }) =>
-      DocumentResult._(
-        success: true,
-        id: id,
-        name: name,
-        content: content,
-        pageCount: pageCount,
-      );
+  factory DocumentResult.success({required String id, required String name, required String content, required int pageCount}) =>
+      DocumentResult._(success: true, id: id, name: name, content: content, pageCount: pageCount);
 
   factory DocumentResult.error(String message) =>
       DocumentResult._(success: false, error: message);
 }
 
 class SavedDocument {
-  final String id;
-  final String name;
-  final String path;
-  final String content;
+  final String id, name, path, content;
   final DateTime addedAt;
 
-  SavedDocument({
-    required this.id,
-    required this.name,
-    required this.path,
-    required this.content,
-    required this.addedAt,
-  });
+  SavedDocument({required this.id, required this.name, required this.path, required this.content, required this.addedAt});
 
-  factory SavedDocument.fromMap(Map<String, dynamic> map) {
-    return SavedDocument(
-      id: map['id'] as String,
-      name: map['name'] as String,
-      path: map['path'] as String,
-      content: map['content'] as String,
-      addedAt: DateTime.fromMillisecondsSinceEpoch(map['added_at'] as int),
-    );
-  }
+  factory SavedDocument.fromMap(Map<String, dynamic> map) => SavedDocument(
+    id: map['id'] as String,
+    name: map['name'] as String,
+    path: map['path'] as String,
+    content: map['content'] as String,
+    addedAt: DateTime.fromMillisecondsSinceEpoch(map['added_at'] as int),
+  );
 }
