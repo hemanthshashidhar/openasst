@@ -30,7 +30,7 @@ dependencies:
   # Text to speech
   flutter_tts: ^3.8.5
 
-  # PDF reading
+  # PDF reading 
   syncfusion_flutter_pdf: ^24.1.41
 
   # File picker
