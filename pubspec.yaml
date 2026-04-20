@@ -33,7 +33,7 @@ dependencies:
   # PDF reading 
   syncfusion_flutter_pdf: ^24.1.41
 
-  # File picker
+  # File picker 
   file_picker: ^8.0.0
 
   # Alarm / phone actions
