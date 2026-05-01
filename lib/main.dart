@@ -4,7 +4,7 @@ import 'package:flutter_overlay_window/flutter_overlay_window.dart';
 
 import 'memory/database.dart';
 import 'settings/settings_screen.dart';
-import 'settings/document_screen.dart';
+import 'settings/document_screen.dart'; 
 import 'settings/telegram_screen.dart';
 import 'overlay/chat_overlay.dart';
 import 'overlay/bubble_entry.dart';
